@@ -123,15 +123,14 @@ jobs:
       - name: Build the kext with the strong profile
         if: steps.version.outputs.skip == 'false'
         working-directory: src
-        timeout-minutes: 10
+        timeout-minutes: 5
         run: |
-          # strong: substitution and splitting everywhere, bogus control flow at
-          # the default rate, and flattening only where the source annotates
-          # HD_FLA. Hot identity lookups and the mmap hooks carry HD_NO_BCF so
-          # no predicate is added to each call. Loop counts above 1 and a global
-          # -fla grow the CFG without bound and can keep a build from finishing.
+          # strong: substitution and splitting everywhere; flattening and bogus
+          # control flow only on the functions the source annotates with HD_FLA
+          # and HD_BCF. A global -bcf or -fla over every function grows the CFG
+          # per function and is what made a strong build take minutes.
           CXX="$LLVM_PREFIX/bin/clang++" \
-          EXTRA_CXXFLAGS="-fpass-plugin=$PLUGIN -mllvm -bcf -mllvm -sub -mllvm -split" \
+          EXTRA_CXXFLAGS="-fpass-plugin=$PLUGIN -mllvm -sub -mllvm -split" \
           OBF_PROFILE=strong \
           zsh Tools/build.zsh
 
@@ -191,12 +190,12 @@ jobs:
       - name: Build the debug kext
         if: steps.version.outputs.skip == 'false'
         working-directory: src
-        timeout-minutes: 10
+        timeout-minutes: 5
         run: |
-          # Debug build: the same pass plugin and strong settings, with debug
-          # symbols kept (no -S, -g) and the profile stamped as debug.
+          # Debug build: the same pass plugin and annotation-driven settings,
+          # with debug symbols kept (no -S, -g) and the profile stamped.
           CXX="$LLVM_PREFIX/bin/clang++" \
-          EXTRA_CXXFLAGS="-g -fpass-plugin=$PLUGIN -mllvm -bcf -mllvm -sub -mllvm -split" \
+          EXTRA_CXXFLAGS="-g -fpass-plugin=$PLUGIN -mllvm -sub -mllvm -split" \
           HACKDOC_PLAIN=1 OBF_PROFILE=debug \
           zsh Tools/build.zsh
           # The debug build keeps the names on purpose.
