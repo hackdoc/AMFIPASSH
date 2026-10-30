@@ -54,7 +54,6 @@ jobs:
           {
             echo "version=$version"
             echo "tag=v$version"
-            echo "source_commit=$(git -C src rev-parse --short HEAD)"
           } >> "$GITHUB_OUTPUT"
           if [ "${{ inputs.force }}" != "true" ] && \
              gh release view "v$version" --repo "$TARGET_REPO" >/dev/null 2>&1; then
@@ -123,10 +122,12 @@ jobs:
         if: steps.version.outputs.skip == 'false'
         working-directory: src
         run: |
-          # strong: bogus control flow, substitution and splitting everywhere,
-          # plus flattening on the functions the source annotates with HD_FLA.
+          # strong: bogus control flow with a higher rate and two loops,
+          # two substitution loops, more split blocks, plus flattening on the
+          # functions the source annotates with HD_FLA. A global -fla is kept
+          # off because it flattens every function and never finishes.
           CXX="$LLVM_PREFIX/bin/clang++" \
-          EXTRA_CXXFLAGS="-fpass-plugin=$PLUGIN -mllvm -bcf -mllvm -sub -mllvm -split" \
+          EXTRA_CXXFLAGS="-fpass-plugin=$PLUGIN -mllvm -bcf -mllvm -bcf_prob=50 -mllvm -bcf_loop=2 -mllvm -sub -mllvm -sub_loop=2 -mllvm -split -mllvm -split_num=3" \
           OBF_PROFILE=strong \
           zsh Tools/build.zsh
 
@@ -175,9 +176,8 @@ jobs:
           {
             echo "Hackdoc AMFIPassH ${{ steps.version.outputs.tag }}"
             echo
-            echo "- kext：AMFIPassH.kext，LLVM + OLLVM strong（bcf/sub/split，函数级 flatten 由源码 HD_FLA 注解控制），Hackdoc 签名"
-            echo "- 状态面板：AMFIPASSH Monitor.app，Hackdoc 签名，不混淆"
-            echo "- 源码：pyquick/AMFIPass @ ${{ steps.version.outputs.source_commit }}"
+            echo "- kext：AMFIPassH.kext（已签名）"
+            echo "- 状态面板：AMFIPASSH Monitor.app（已签名，不混淆）"
             echo
             echo "安装：将 AMFIPassH.kext 放入 EFI/OC/Kexts，并在 Kernel -> Add 中排在 Lilu 之后；SecureBootModel 设为 Disabled；不要添加 amfi 启动参数。"
             echo

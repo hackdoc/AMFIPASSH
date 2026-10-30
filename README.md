@@ -1,33 +1,22 @@
 # AMFIPASSH
 
-在保证 AMFI 开启的情况下绕过 hackdoc 签名的 framework、kext 等，以及 nullmoth 的驱动。
+AMFIPassH 的已签名发布页。每次发布包含两个产物：
 
-本仓库只承载发布流程与发布产物；源码在 [pyquick/AMFIPass](https://github.com/pyquick/AMFIPass)。
+- `AMFIPassH-kext-strong.zip`：`AMFIPassH.kext`
+- `AMFIPASSH-Monitor.zip`：`AMFIPASSH Monitor.app`
 
-## 发布流程
+## 安装 kext
 
-`.github/workflows/release.yml` 每 30 分钟运行一次（也可手动触发）：
+1. 下载并解压 `AMFIPassH-kext-strong.zip`。
+2. 将 `AMFIPassH.kext` 放入 `EFI/OC/Kexts`。
+3. 在 OpenCore 配置的 `Kernel -> Add` 中加入该条目，排在 Lilu 之后。
+4. 将 `SecureBootModel` 设为 `Disabled`，不要添加 `amfi` 启动参数。
+5. 重启。
 
-1. 用 `PYQUICK_TOKEN` 克隆 `pyquick/AMFIPass`，从 `Tools/build.zsh` 读取 `VERSION`。
-2. 检查本仓库是否已有 `v<VERSION>` 的 release；存在则直接结束，不编译。手动触发时勾选 `force` 可强制重建，会先删除同 tag 的旧 release 与 tag。
-3. 安装 Homebrew LLVM 与 cmake，构建 OLLVM 插件，用 strong 配置编译 kext：`-bcf -sub -split`，函数级 flatten 由源码的 `HD_FLA` 注解控制。
-4. 从 `HACKDOC_P12_BASE64` / `HACKDOC_P12_PASSWORD` 导入签名身份，kext 与状态面板都用 `Hackdoc Code Signing` 签名。
-5. 编译状态面板，不混淆；源码中的 `Test/monitor/build.zsh` 已直接产出 `AMFIPASSH Monitor.app`。
-6. 打 tag 并创建 release，附上两个压缩包。
+## 状态面板
 
-## 需要配置的 Secrets
+解压 `AMFIPASSH-Monitor.zip`，把 `AMFIPASSH Monitor.app` 拖入 `/Applications` 后打开。它显示 kext 是否加载、钩子状态与放行记录，并提供放行测试与 TCC 授权检查。
 
-| 名称 | 用途 |
-| --- | --- |
-| `PYQUICK_TOKEN` | 克隆 pyquick/AMFIPass 的访问令牌 |
-| `HACKDOC_P12_BASE64` | Hackdoc 代码签名身份的 .p12，base64 编码 |
-| `HACKDOC_P12_PASSWORD` | 上述 .p12 的密码 |
+## 发布方式
 
-`GITHUB_TOKEN` 由工作流自动提供，用于在本仓库创建 release。
-
-## 产物
-
-- `AMFIPassH-kext-strong.zip`：`AMFIPassH.kext`，LLVM + OLLVM strong，Hackdoc 签名
-- `AMFIPASSH-Monitor.zip`：`AMFIPASSH Monitor.app`，Hackdoc 签名，不混淆
-
-安装：将 `AMFIPassH.kext` 放入 `EFI/OC/Kexts`，并在 `Kernel -> Add` 中排在 Lilu 之后；`SecureBootModel` 设为 `Disabled`；不要添加 `amfi` 启动参数。
+Actions 每 30 分钟检查一次是否有新版本：有新版本时自动编译并发布，版本已发布则跳过。也可以在 Actions 页面手动运行；勾选 `force` 会替换同版本的旧发布。
