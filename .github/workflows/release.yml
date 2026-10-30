@@ -192,6 +192,11 @@ jobs:
       - name: Create the release
         if: steps.version.outputs.skip == 'false'
         run: |
+          # A forced run replaces the existing release for this tag.
+          if [ "${{ inputs.force }}" = "true" ]; then
+            gh release delete "${{ steps.version.outputs.tag }}" \
+              --repo "$TARGET_REPO" --yes --cleanup-tag || true
+          fi
           gh release create "${{ steps.version.outputs.tag }}" \
             --repo "$TARGET_REPO" \
             --title "AMFIPassH ${{ steps.version.outputs.version }}" \
