@@ -130,7 +130,7 @@ jobs:
           # and HD_BCF. A global -bcf or -fla over every function grows the CFG
           # per function and is what made a strong build take minutes.
           CXX="$LLVM_PREFIX/bin/clang++" \
-          EXTRA_CXXFLAGS="-fpass-plugin=$PLUGIN -mllvm -sub -mllvm -split" \
+          EXTRA_CXXFLAGS="-fpass-plugin=$PLUGIN -mllvm -sub -mllvm -split -mllvm -aesSeed=${{ github.run_id }}-${{ github.run_attempt }}" \
           OBF_PROFILE=strong \
           zsh Tools/build.zsh
 
@@ -195,7 +195,7 @@ jobs:
           # Debug build: the same pass plugin and annotation-driven settings,
           # with debug symbols kept (no -S, -g) and the profile stamped.
           CXX="$LLVM_PREFIX/bin/clang++" \
-          EXTRA_CXXFLAGS="-g -fpass-plugin=$PLUGIN -mllvm -sub -mllvm -split" \
+          EXTRA_CXXFLAGS="-g -fpass-plugin=$PLUGIN -mllvm -sub -mllvm -split -mllvm -aesSeed=${{ github.run_id }}-${{ github.run_attempt }}" \
           HACKDOC_PLAIN=1 OBF_PROFILE=debug \
           zsh Tools/build.zsh
           # The debug build keeps the names on purpose.
