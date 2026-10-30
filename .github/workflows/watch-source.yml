@@ -24,7 +24,7 @@ concurrency:
 jobs:
   watch:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 330
     steps:
       - name: Poll pyquick/AMFIPass for a new head
         env:
@@ -33,8 +33,9 @@ jobs:
         run: |
           [ -n "$PYQUICK_TOKEN" ] || { echo "PYQUICK_TOKEN is missing" >&2; exit 1; }
           last=""
-          # Stay under the 360 minute job limit; the top-up runs when it ends.
-          for i in $(seq 1 350); do
+          # Five hours, well under the six hour job limit, so the restart step
+          # always gets to run. A chain that breaks is picked up by the cron.
+          for i in $(seq 1 300); do
             head=$(curl -sS -H "Authorization: Bearer $PYQUICK_TOKEN" \
               -H "Accept: application/vnd.github+json" \
               https://api.github.com/repos/pyquick/AMFIPass/commits/main |
@@ -59,9 +60,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          curl -sS -o /dev/null -w 'watch restart HTTP %{http_code}\n' -X POST \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            https://api.github.com/repos/hackdoc/AMFIPASSH/actions/workflows/watch-source.yml/dispatches \
-            -d '{"ref":"main"}'
+          # Three attempts, then let the cron bootstrap take over.
+          for attempt in 1 2 3; do
+            status=$(curl -sS -o /dev/null -w '%{http_code}' -X POST \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              https://api.github.com/repos/hackdoc/AMFIPASSH/actions/workflows/watch-source.yml/dispatches \
+              -d '{"ref":"main"}')
+            echo "watch restart HTTP $status (attempt $attempt)"
+            case "$status" in 2*) exit 0 ;; esac
+            sleep 20
+          done
+          exit 1
