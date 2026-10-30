@@ -138,10 +138,12 @@ jobs:
           # control flow only on the functions the source annotates with HD_FLA
           # and HD_BCF. A global -bcf or -fla over every function grows the CFG
           # per function and is what made a strong build take minutes.
+          start=$(date +%s)
           CXX="$LLVM_PREFIX/bin/clang++" \
           EXTRA_CXXFLAGS="-fpass-plugin=$PLUGIN -mllvm -sub -mllvm -split -mllvm -aesSeed=$OBF_SEED" \
-          OBF_PROFILE=strong \
+          OBF_PROFILE=strong HACKDOC_RANDOM_LAYOUT=1 \
           zsh Tools/build.zsh
+          echo "release build took $(( $(date +%s) - start ))s" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Verify the kext signature and profile
         if: steps.version.outputs.skip == 'false'
@@ -161,7 +163,7 @@ jobs:
             exit 1
           fi
           leaked=$(strings -a Build/AMFIPassH.kext/Contents/MacOS/AMFIPassH |
-            grep 'hdamfi' || true)
+            grep -E 'hdamfi|_mac_file_check|X509|AppleMobileFileIntegrity' || true)
           if [ -n "$leaked" ]; then
             echo "release build still contains hdamfi strings:" >&2
             echo "$leaked" >&2
@@ -203,10 +205,12 @@ jobs:
         run: |
           # Debug build: the same pass plugin and annotation-driven settings,
           # with debug symbols kept (no -S, -g) and the profile stamped.
+          start=$(date +%s)
           CXX="$LLVM_PREFIX/bin/clang++" \
           EXTRA_CXXFLAGS="-g -fpass-plugin=$PLUGIN -mllvm -sub -mllvm -split -mllvm -aesSeed=$OBF_SEED" \
           HACKDOC_PLAIN=1 OBF_PROFILE=debug \
           zsh Tools/build.zsh
+          echo "debug build took $(( $(date +%s) - start ))s" | tee -a "$GITHUB_STEP_SUMMARY"
           # The debug build keeps the names on purpose.
           nm -a Build/AMFIPassH.kext/Contents/MacOS/AMFIPassH | grep -q pluginStart || {
             echo "debug build lost its symbol names" >&2
