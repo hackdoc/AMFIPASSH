@@ -38,8 +38,7 @@ jobs:
             head=$(curl -sS -H "Authorization: Bearer $PYQUICK_TOKEN" \
               -H "Accept: application/vnd.github+json" \
               https://api.github.com/repos/pyquick/AMFIPass/commits/main |
-              python3 -c 'import json,sys
-              print(json.load(sys.stdin).get("sha", ""))' || true)
+              python3 -c 'import json,sys;print(json.load(sys.stdin).get("sha",""))' || true)
             if [ -n "$head" ] && [ "$head" != "$last" ]; then
               echo "source head $head (was ${last:-none})"
               last="$head"
