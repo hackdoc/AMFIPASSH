@@ -140,7 +140,7 @@ jobs:
           # per function and is what made a strong build take minutes.
           start=$(date +%s)
           CXX="$LLVM_PREFIX/bin/clang++" \
-          EXTRA_CXXFLAGS="-fpass-plugin=$PLUGIN -mllvm -sub -mllvm -split -mllvm -aesSeed=$OBF_SEED" \
+          EXTRA_CXXFLAGS="-fpass-plugin=$PLUGIN -mllvm -sub -mllvm -split -mllvm -split_num=3 -mllvm -aesSeed=$OBF_SEED" \
           OBF_PROFILE=strong HACKDOC_RANDOM_LAYOUT=1 \
           zsh Tools/build.zsh
           echo "release build took $(( $(date +%s) - start ))s" | tee -a "$GITHUB_STEP_SUMMARY"
@@ -208,7 +208,7 @@ jobs:
           # substitution and splitting remain, symbols are kept.
           start=$(date +%s)
           CXX="$LLVM_PREFIX/bin/clang++" \
-          EXTRA_CXXFLAGS="-g -fpass-plugin=$PLUGIN -mllvm -sub -mllvm -split -mllvm -aesSeed=$OBF_SEED" \
+          EXTRA_CXXFLAGS="-g -fpass-plugin=$PLUGIN -mllvm -sub -mllvm -split -mllvm -split_num=3 -mllvm -aesSeed=$OBF_SEED" \
           HACKDOC_PLAIN=1 OBF_PROFILE=debug \
           zsh Tools/build.zsh
           echo "debug build took $(( $(date +%s) - start ))s" | tee -a "$GITHUB_STEP_SUMMARY"
