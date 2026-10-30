@@ -143,6 +143,12 @@ jobs:
             echo "the kext is not signed by the Hackdoc identity" >&2
             exit 1
           }
+          # The release build must not leak the gate layout through nlist names.
+          if nm -a Build/AMFIPassH.kext/Contents/MacOS/AMFIPassH |
+             grep -qE 'isHackdoc|wrapFileCheck|blobIsHackdoc|pluginStart'; then
+            echo "release build still exposes internal symbol names" >&2
+            exit 1
+          fi
           python3 -I - <<'PY'
           import plistlib
           d = plistlib.load(open('Build/AMFIPassH.kext/Contents/Info.plist', 'rb'))
@@ -182,6 +188,11 @@ jobs:
           EXTRA_CXXFLAGS="-g -fpass-plugin=$PLUGIN -mllvm -bcf -mllvm -sub -mllvm -split" \
           HACKDOC_PLAIN=1 OBF_PROFILE=debug \
           zsh Tools/build.zsh
+          # The debug build keeps the names on purpose.
+          nm -a Build/AMFIPassH.kext/Contents/MacOS/AMFIPassH | grep -q pluginStart || {
+            echo "debug build lost its symbol names" >&2
+            exit 1
+          }
           codesign -dvvv Build/AMFIPassH.kext 2>&1 | grep -E 'Identifier|Authority'
           codesign -dvvv Build/AMFIPassH.kext 2>&1 | grep -q 'Authority=Hackdoc' || {
             echo "the debug kext is not signed by the Hackdoc identity" >&2
