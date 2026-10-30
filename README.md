@@ -1,0 +1,2 @@
+# AMFIPASSH
+在保证AMFI开启的情况下绕过hackdoc签名的framework,kext等,以及nullmoth的驱动
