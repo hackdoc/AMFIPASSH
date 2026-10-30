@@ -122,10 +122,11 @@ jobs:
         if: steps.version.outputs.skip == 'false'
         working-directory: src
         run: |
-          # strong: bogus control flow, substitution and splitting at their
-          # default rates, plus flattening on the functions the source
-          # annotates with HD_FLA. Loop counts above 1 and a global -fla grow
-          # the CFG without bound and can keep a build from finishing.
+          # strong: substitution and splitting everywhere, bogus control flow at
+          # the default rate, and flattening only where the source annotates
+          # HD_FLA. Hot identity lookups and the mmap hooks carry HD_NO_BCF so
+          # no predicate is added to each call. Loop counts above 1 and a global
+          # -fla grow the CFG without bound and can keep a build from finishing.
           CXX="$LLVM_PREFIX/bin/clang++" \
           EXTRA_CXXFLAGS="-fpass-plugin=$PLUGIN -mllvm -bcf -mllvm -sub -mllvm -split" \
           OBF_PROFILE=strong \
