@@ -6,7 +6,7 @@
 
 ## 发布流程
 
-`.github/workflows/release.yml` 每 6 小时运行一次（也可手动触发）：
+`.github/workflows/release.yml` 每 30 分钟运行一次（也可手动触发）：
 
 1. 用 `PYQUICK_TOKEN` 克隆 `pyquick/AMFIPass`，从 `Tools/build.zsh` 读取 `VERSION`。
 2. 检查本仓库是否已有 `v<VERSION>` 的 release；存在则直接结束，不编译。手动触发时勾选 `force` 可强制重建。
