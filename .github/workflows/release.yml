@@ -122,12 +122,12 @@ jobs:
         if: steps.version.outputs.skip == 'false'
         working-directory: src
         run: |
-          # strong: bogus control flow with a higher rate and two loops,
-          # two substitution loops, more split blocks, plus flattening on the
-          # functions the source annotates with HD_FLA. A global -fla is kept
-          # off because it flattens every function and never finishes.
+          # strong: bogus control flow, substitution and splitting at their
+          # default rates, plus flattening on the functions the source
+          # annotates with HD_FLA. Loop counts above 1 and a global -fla grow
+          # the CFG without bound and can keep a build from finishing.
           CXX="$LLVM_PREFIX/bin/clang++" \
-          EXTRA_CXXFLAGS="-fpass-plugin=$PLUGIN -mllvm -bcf -mllvm -bcf_prob=50 -mllvm -bcf_loop=2 -mllvm -sub -mllvm -sub_loop=2 -mllvm -split -mllvm -split_num=3" \
+          EXTRA_CXXFLAGS="-fpass-plugin=$PLUGIN -mllvm -bcf -mllvm -sub -mllvm -split" \
           OBF_PROFILE=strong \
           zsh Tools/build.zsh
 
