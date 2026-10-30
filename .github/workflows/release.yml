@@ -28,7 +28,9 @@ concurrency:
 jobs:
   build-and-release:
     runs-on: macos-26
-    timeout-minutes: 90
+    # The job builds the kext twice with the pass plugin (release and debug)
+    # on top of brew, the plugin build and the panel.
+    timeout-minutes: 150
     env:
       GH_TOKEN: ${{ github.token }}
       PYQUICK_TOKEN: ${{ secrets.PYQUICK_TOKEN }}
