@@ -203,8 +203,9 @@ jobs:
         working-directory: src
         timeout-minutes: 5
         run: |
-          # Debug build: the same pass plugin and annotation-driven settings,
-          # with debug symbols kept (no -S, -g) and the profile stamped.
+          # Debug build: the same plugin and seed, but HACKDOC_PLAIN empties
+          # the fla/bcf annotations because -g plus flattening takes minutes;
+          # substitution and splitting remain, symbols are kept.
           start=$(date +%s)
           CXX="$LLVM_PREFIX/bin/clang++" \
           EXTRA_CXXFLAGS="-g -fpass-plugin=$PLUGIN -mllvm -sub -mllvm -split -mllvm -aesSeed=$OBF_SEED" \
