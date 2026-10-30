@@ -174,8 +174,12 @@ jobs:
         if: steps.version.outputs.skip == 'false'
         working-directory: src
         run: |
-          # Debug build: stock compiler, no pass plugin, debug symbols kept.
-          HACKDOC_PLAIN=1 EXTRA_CXXFLAGS="-g" zsh Tools/build.zsh
+          # Debug build: the same pass plugin and strong settings, with debug
+          # symbols kept (no -S, -g) and the profile stamped as debug.
+          CXX="$LLVM_PREFIX/bin/clang++" \
+          EXTRA_CXXFLAGS="-g -fpass-plugin=$PLUGIN -mllvm -bcf -mllvm -sub -mllvm -split" \
+          HACKDOC_PLAIN=1 OBF_PROFILE=debug \
+          zsh Tools/build.zsh
           codesign -dvvv Build/AMFIPassH.kext 2>&1 | grep -E 'Identifier|Authority'
           codesign -dvvv Build/AMFIPassH.kext 2>&1 | grep -q 'Authority=Hackdoc' || {
             echo "the debug kext is not signed by the Hackdoc identity" >&2
