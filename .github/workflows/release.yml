@@ -11,6 +11,8 @@ name: release
 on:
   schedule:
     - cron: '*/5 * * * *'
+  repository_dispatch:
+    types: [source-updated]
   workflow_dispatch:
     inputs:
       force:
