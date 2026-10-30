@@ -1,0 +1,68 @@
+name: watch-source
+
+# Watches pyquick/AMFIPass without needing a token in that repository. The
+# token already stored here is used to read the source commits, and the job
+# asks the release workflow to check the version whenever the head changes.
+# A self dispatch keeps the loop alive instead of relying on the cron.
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [watch]
+  schedule:
+    - cron: '*/30 * * * *'
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Poll pyquick/AMFIPass for a new head
+        env:
+          PYQUICK_TOKEN: ${{ secrets.PYQUICK_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ -n "$PYQUICK_TOKEN" ] || { echo "PYQUICK_TOKEN is missing" >&2; exit 1; }
+          last=""
+          # Stay under the 360 minute job limit; the top-up runs when it ends.
+          for i in $(seq 1 350); do
+            head=$(curl -sS -H "Authorization: Bearer $PYQUICK_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              https://api.github.com/repos/pyquick/AMFIPass/commits/main |
+              python3 -c 'import json,sys
+try:
+    print(json.load(sys.stdin).get("sha", ""))
+except Exception:
+    print("")')
+            if [ -n "$head" ] && [ "$head" != "$last" ]; then
+              echo "source head $head (was ${last:-none})"
+              last="$head"
+              curl -sS -X POST \
+                -H "Authorization: Bearer $GH_TOKEN" \
+                -H "Accept: application/vnd.github+json" \
+                -H "X-GitHub-Api-Version: 2022-11-28" \
+                https://api.github.com/repos/hackdoc/AMFIPASSH/dispatches \
+                -d '{"event_type":"source-updated"}'
+            fi
+            sleep 60
+          done
+
+      - name: Keep the watch alive
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          curl -sS -o /dev/null -w 'watch restart HTTP %{http_code}\n' -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/hackdoc/AMFIPASSH/actions/workflows/watch-source.yml/dispatches \
+            -d '{"ref":"main"}'
