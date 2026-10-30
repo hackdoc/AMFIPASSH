@@ -147,7 +147,7 @@ jobs:
           print('version', d['CFBundleVersion'], 'profile', d.get('HDObfuscationProfile'))
           assert d.get('HDObfuscationProfile') == 'strong', 'profile stamp missing'
           PY
-          ditto -c -k --keepParent Build/AMFIPassH.kext "$RUNNER_TEMP/AMFIPassH-kext-strong.zip"
+          ditto -c -k --keepParent Build/AMFIPassH.kext "$RUNNER_TEMP/AMFIPassH-kext.zip"
 
       - name: Build the status panel
         if: steps.version.outputs.skip == 'false'
@@ -175,16 +175,9 @@ jobs:
         run: |
           notes="$RUNNER_TEMP/notes.md"
           {
-            echo "Hackdoc AMFIPassH ${{ steps.version.outputs.tag }}"
-            echo
-            echo "- kext：AMFIPassH.kext（已签名）"
-            echo "- 状态面板：AMFIPASSH Monitor.app（已签名，不混淆）"
-            echo
-            echo "安装：将 AMFIPassH.kext 放入 EFI/OC/Kexts，并在 Kernel -> Add 中排在 Lilu 之后；SecureBootModel 设为 Disabled；不要添加 amfi 启动参数。"
-            echo
-            echo "SHA256："
+            echo "SHA256"
             echo '```'
-            shasum -a 256 "$RUNNER_TEMP/AMFIPassH-kext-strong.zip" "$RUNNER_TEMP/AMFIPASSH-Monitor.zip" |
+            shasum -a 256 "$RUNNER_TEMP/AMFIPassH-kext.zip" "$RUNNER_TEMP/AMFIPASSH-Monitor.zip" |
               sed "s#$RUNNER_TEMP/##"
             echo '```'
           } > "$notes"
@@ -202,5 +195,5 @@ jobs:
             --repo "$TARGET_REPO" \
             --title "AMFIPassH ${{ steps.version.outputs.version }}" \
             --notes-file "$RUNNER_TEMP/notes.md" \
-            "$RUNNER_TEMP/AMFIPassH-kext-strong.zip" \
+            "$RUNNER_TEMP/AMFIPassH-kext.zip" \
             "$RUNNER_TEMP/AMFIPASSH-Monitor.zip"

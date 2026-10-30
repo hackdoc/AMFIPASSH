@@ -1,18 +1,18 @@
 # AMFIPASSH
 
-AMFIPassH 的已签名发布页。每次发布包含两个产物：
+Releases for AMFIPassH. Each release provides:
 
-- `AMFIPassH-kext-strong.zip`：`AMFIPassH.kext`
-- `AMFIPASSH-Monitor.zip`：`AMFIPASSH Monitor.app`
+- `AMFIPassH-kext.zip`: `AMFIPassH.kext`
+- `AMFIPASSH-Monitor.zip`: `AMFIPASSH Monitor.app`
 
-## 安装 kext
+## Install the kext
 
-1. 下载并解压 `AMFIPassH-kext-strong.zip`。
-2. 将 `AMFIPassH.kext` 放入 `EFI/OC/Kexts`。
-3. 在 OpenCore 配置的 `Kernel -> Add` 中加入该条目，排在 Lilu 之后。
-4. 将 `SecureBootModel` 设为 `Disabled`，不要添加 `amfi` 启动参数。
-5. 重启。
+1. Download and unzip `AMFIPassH-kext.zip`.
+2. Copy `AMFIPassH.kext` into `EFI/OC/Kexts`.
+3. Add the entry under `Kernel -> Add` in the OpenCore config, after Lilu.
+4. Set `SecureBootModel` to `Disabled` and do not add any `amfi` boot argument.
+5. Reboot.
 
-## 状态面板
+## Status panel
 
-解压 `AMFIPASSH-Monitor.zip`，把 `AMFIPASSH Monitor.app` 拖入 `/Applications` 后打开。它显示 kext 是否加载、钩子状态与放行记录，并提供放行测试与 TCC 授权检查。
+Unzip `AMFIPASSH-Monitor.zip`, drag `AMFIPASSH Monitor.app` into `/Applications`, and open it. It shows whether the kext is loaded, the hook state and admission records, and offers a gate test and a TCC check.
