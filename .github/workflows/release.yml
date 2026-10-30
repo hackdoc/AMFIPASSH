@@ -69,6 +69,13 @@ jobs:
           fi
           echo "### AMFIPassH v$version" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Derive the obfuscation seed
+        if: steps.version.outputs.skip == 'false'
+        run: |
+          # The pass plugin wants the AES-CTR seed as 32 hex characters.
+          seed=$(printf '%032x' ${{ github.run_id }})
+          echo "OBF_SEED=$seed" >> "$GITHUB_ENV"
+          echo "obfuscation seed: $seed"
       - name: Install Homebrew LLVM and cmake
         if: steps.version.outputs.skip == 'false'
         run: |
@@ -132,7 +139,7 @@ jobs:
           # and HD_BCF. A global -bcf or -fla over every function grows the CFG
           # per function and is what made a strong build take minutes.
           CXX="$LLVM_PREFIX/bin/clang++" \
-          EXTRA_CXXFLAGS="-fpass-plugin=$PLUGIN -mllvm -sub -mllvm -split -mllvm -aesSeed=${{ github.run_id }}-${{ github.run_attempt }}" \
+          EXTRA_CXXFLAGS="-fpass-plugin=$PLUGIN -mllvm -sub -mllvm -split -mllvm -aesSeed=$OBF_SEED" \
           OBF_PROFILE=strong \
           zsh Tools/build.zsh
 
@@ -197,7 +204,7 @@ jobs:
           # Debug build: the same pass plugin and annotation-driven settings,
           # with debug symbols kept (no -S, -g) and the profile stamped.
           CXX="$LLVM_PREFIX/bin/clang++" \
-          EXTRA_CXXFLAGS="-g -fpass-plugin=$PLUGIN -mllvm -sub -mllvm -split -mllvm -aesSeed=${{ github.run_id }}-${{ github.run_attempt }}" \
+          EXTRA_CXXFLAGS="-g -fpass-plugin=$PLUGIN -mllvm -sub -mllvm -split -mllvm -aesSeed=$OBF_SEED" \
           HACKDOC_PLAIN=1 OBF_PROFILE=debug \
           zsh Tools/build.zsh
           # The debug build keeps the names on purpose.
