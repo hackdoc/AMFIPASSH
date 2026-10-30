@@ -123,6 +123,7 @@ jobs:
       - name: Build the kext with the strong profile
         if: steps.version.outputs.skip == 'false'
         working-directory: src
+        timeout-minutes: 10
         run: |
           # strong: substitution and splitting everywhere, bogus control flow at
           # the default rate, and flattening only where the source annotates
@@ -144,14 +145,18 @@ jobs:
             exit 1
           }
           # The release build must not leak the gate layout through nlist names.
-          if nm -a Build/AMFIPassH.kext/Contents/MacOS/AMFIPassH |
-             grep -qE 'isHackdoc|wrapFileCheck|blobIsHackdoc|pluginStart'; then
-            echo "release build still exposes internal symbol names" >&2
+          names=$(nm -a Build/AMFIPassH.kext/Contents/MacOS/AMFIPassH |
+            grep -E 'isHackdoc|wrapFileCheck|blobIsHackdoc|pluginStart' || true)
+          if [ -n "$names" ]; then
+            echo "release build still exposes internal symbol names:" >&2
+            echo "$names" >&2
             exit 1
           fi
-          if strings -a Build/AMFIPassH.kext/Contents/MacOS/AMFIPassH |
-             grep -q 'hdamfi'; then
-            echo "release build still contains hdamfi strings" >&2
+          leaked=$(strings -a Build/AMFIPassH.kext/Contents/MacOS/AMFIPassH |
+            grep 'hdamfi' || true)
+          if [ -n "$leaked" ]; then
+            echo "release build still contains hdamfi strings:" >&2
+            echo "$leaked" >&2
             exit 1
           fi
           python3 -I - <<'PY'
@@ -186,6 +191,7 @@ jobs:
       - name: Build the debug kext
         if: steps.version.outputs.skip == 'false'
         working-directory: src
+        timeout-minutes: 10
         run: |
           # Debug build: the same pass plugin and strong settings, with debug
           # symbols kept (no -S, -g) and the profile stamped as debug.
