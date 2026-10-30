@@ -181,8 +181,7 @@ jobs:
         if: steps.version.outputs.skip == 'false'
         working-directory: src
         run: |
-          # The panel ships unobfuscated and Test/monitor/build.zsh already
-          # names it AMFIPASSH Monitor.
+          # Test/monitor/build.zsh names the panel, strips it and signs it.
           zsh Test/monitor/build.zsh
 
       - name: Package the status panel
