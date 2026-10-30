@@ -149,6 +149,11 @@ jobs:
             echo "release build still exposes internal symbol names" >&2
             exit 1
           fi
+          if strings -a Build/AMFIPassH.kext/Contents/MacOS/AMFIPassH |
+             grep -q 'hdamfi'; then
+            echo "release build still contains hdamfi strings" >&2
+            exit 1
+          fi
           python3 -I - <<'PY'
           import plistlib
           d = plistlib.load(open('Build/AMFIPassH.kext/Contents/Info.plist', 'rb'))
