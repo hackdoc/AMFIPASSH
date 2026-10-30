@@ -132,7 +132,7 @@ jobs:
       - name: Build the kext with the strong profile
         if: steps.version.outputs.skip == 'false'
         working-directory: src
-        timeout-minutes: 5
+        timeout-minutes: 25
         run: |
           # strong: substitution and splitting everywhere; flattening and bogus
           # control flow only on the functions the source annotates with HD_FLA
@@ -140,7 +140,7 @@ jobs:
           # per function and is what made a strong build take minutes.
           start=$(date +%s)
           CXX="$LLVM_PREFIX/bin/clang++" \
-          EXTRA_CXXFLAGS="-fpass-plugin=$PLUGIN -mllvm -sub -mllvm -split -mllvm -aesSeed=$OBF_SEED" \
+          EXTRA_CXXFLAGS="-fpass-plugin=$PLUGIN -mllvm -sub -mllvm -split -mllvm -split_num=3 -mllvm -aesSeed=$OBF_SEED" \
           OBF_PROFILE=strong HACKDOC_RANDOM_LAYOUT=1 \
           zsh Tools/build.zsh
           echo "release build took $(( $(date +%s) - start ))s" | tee -a "$GITHUB_STEP_SUMMARY"
@@ -201,7 +201,7 @@ jobs:
       - name: Build the debug kext
         if: steps.version.outputs.skip == 'false'
         working-directory: src
-        timeout-minutes: 5
+        timeout-minutes: 25
         run: |
           # Debug build: the same plugin and seed, but HACKDOC_PLAIN empties
           # the fla/bcf annotations because -g plus flattening takes minutes;
