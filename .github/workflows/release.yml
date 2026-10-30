@@ -1,0 +1,202 @@
+name: release
+
+# Watches pyquick/AMFIPass for a version bump and publishes it here.
+# The source tree is cloned at run time, built with LLVM + the OLLVM pass
+# plugin (strong profile), signed with the Hackdoc identity, and shipped as a
+# GitHub release in this repository together with the status panel.
+#
+# Runs on a schedule and on demand. When a release for the version already
+# exists the job stops before building anything.
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "rebuild even when the version already has a release"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    runs-on: macos-26
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PYQUICK_TOKEN: ${{ secrets.PYQUICK_TOKEN }}
+      P12_BASE64: ${{ secrets.HACKDOC_P12_BASE64 }}
+      P12_PASSWORD: ${{ secrets.HACKDOC_P12_PASSWORD }}
+      TARGET_REPO: hackdoc/AMFIPASSH
+      OLLVM_REPO: https://github.com/vertigo-z/ollvm
+    steps:
+      - name: Clone pyquick/AMFIPass
+        run: |
+          [ -n "$PYQUICK_TOKEN" ] || { echo "PYQUICK_TOKEN is missing" >&2; exit 1; }
+          # Keep the token out of the clone URL so it cannot reach the logs.
+          auth=$(printf 'x-access-token:%s' "$PYQUICK_TOKEN" | base64)
+          git -c http.extraheader="AUTHORIZATION: basic $auth" clone --depth 1 \
+            https://github.com/pyquick/AMFIPass.git src
+          git -C src log -1 --format='source commit: %h %s'
+
+      - name: Check the version against existing releases
+        id: version
+        run: |
+          version=$(sed -n 's/^VERSION=//p' src/Tools/build.zsh | head -1)
+          [ -n "$version" ] || { echo "VERSION not found in Tools/build.zsh" >&2; exit 1; }
+          {
+            echo "version=$version"
+            echo "tag=v$version"
+            echo "source_commit=$(git -C src rev-parse --short HEAD)"
+          } >> "$GITHUB_OUTPUT"
+          if [ "${{ inputs.force }}" != "true" ] && \
+             gh release view "v$version" --repo "$TARGET_REPO" >/dev/null 2>&1; then
+            echo "release v$version already exists; nothing to build"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "will build v$version"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "### AMFIPassH v$version" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install Homebrew LLVM and cmake
+        if: steps.version.outputs.skip == 'false'
+        run: |
+          brew install llvm cmake
+          echo "LLVM_PREFIX=$(brew --prefix llvm)" >> "$GITHUB_ENV"
+          "$(brew --prefix llvm)/bin/clang" --version | head -2
+
+      - name: Build the OLLVM pass plugin
+        if: steps.version.outputs.skip == 'false'
+        run: |
+          git clone --depth 1 "$OLLVM_REPO" /tmp/ollvm
+          mkdir -p /tmp/ollvm/build && cd /tmp/ollvm/build
+          cmake ../obfuscation \
+            -DLLVM_DIR="$LLVM_PREFIX/lib/cmake/llvm" \
+            -DCMAKE_C_COMPILER="$LLVM_PREFIX/bin/clang" \
+            -DCMAKE_CXX_COMPILER="$LLVM_PREFIX/bin/clang++"
+          make -j"$(sysctl -n hw.ncpu)"
+          plugin=$(find . -maxdepth 3 -name 'libObfuscation.*' | head -1)
+          [ -n "$plugin" ] || { echo "plugin was not produced" >&2; exit 1; }
+          echo "PLUGIN=$(cd "$(dirname "$plugin")" && pwd)/$(basename "$plugin")" >> "$GITHUB_ENV"
+          ls -l "$plugin"
+
+      - name: Fetch pinned dependencies
+        if: steps.version.outputs.skip == 'false'
+        working-directory: src
+        run: zsh Tools/prepare_vendor.zsh
+
+      - name: Import the Hackdoc signing identity
+        if: steps.version.outputs.skip == 'false'
+        working-directory: src
+        run: |
+          [ -n "$P12_BASE64" ] || { echo "HACKDOC_P12_BASE64 is missing" >&2; exit 1; }
+          printf '%s' "$P12_BASE64" | base64 -D > "$RUNNER_TEMP/signing.p12"
+          security create-keychain -p actions build.keychain
+          security default-keychain -s build.keychain
+          # find-identity searches the keychain list, not only the default one.
+          security list-keychains -d user -s build.keychain
+          security unlock-keychain -p actions build.keychain
+          security set-keychain-settings -lut 21600 build.keychain
+          security import "$RUNNER_TEMP/signing.p12" -k build.keychain \
+            -P "$P12_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k actions build.keychain >/dev/null
+          rm -f "$RUNNER_TEMP/signing.p12"
+          # Trusting the pinned root makes the imported identity valid.
+          sudo security add-trusted-cert -d -r trustRoot \
+            -k /Library/Keychains/System.keychain certs/rootCA.crt
+          security find-identity -p codesigning build.keychain
+          security find-identity -p codesigning build.keychain | grep -q "Hackdoc" || {
+            echo "the Hackdoc identity was not imported" >&2
+            exit 1
+          }
+
+      - name: Build the kext with the strong profile
+        if: steps.version.outputs.skip == 'false'
+        working-directory: src
+        run: |
+          # strong: bogus control flow, substitution and splitting everywhere,
+          # plus flattening on the functions the source annotates with HD_FLA.
+          CXX="$LLVM_PREFIX/bin/clang++" \
+          EXTRA_CXXFLAGS="-fpass-plugin=$PLUGIN -mllvm -bcf -mllvm -sub -mllvm -split" \
+          OBF_PROFILE=strong \
+          zsh Tools/build.zsh
+
+      - name: Verify the kext signature and profile
+        if: steps.version.outputs.skip == 'false'
+        working-directory: src
+        run: |
+          codesign -dvvv Build/AMFIPassH.kext 2>&1 | grep -E 'Identifier|Authority|CDHash'
+          codesign -dvvv Build/AMFIPassH.kext 2>&1 | grep -q 'Authority=Hackdoc' || {
+            echo "the kext is not signed by the Hackdoc identity" >&2
+            exit 1
+          }
+          python3 -I - <<'PY'
+          import plistlib
+          d = plistlib.load(open('Build/AMFIPassH.kext/Contents/Info.plist', 'rb'))
+          print('version', d['CFBundleVersion'], 'profile', d.get('HDObfuscationProfile'))
+          assert d.get('HDObfuscationProfile') == 'strong', 'profile stamp missing'
+          PY
+          ditto -c -k --keepParent Build/AMFIPassH.kext "$RUNNER_TEMP/AMFIPassH-kext-strong.zip"
+
+      - name: Build the status panel
+        if: steps.version.outputs.skip == 'false'
+        working-directory: src
+        run: |
+          # The panel ships unobfuscated; only its display name changes.
+          sed -i '' 's/AMFipassH 状态面板/AMFIPASSH Monitor/g' Test/monitor/MonitorApp.swift
+          zsh Test/monitor/build.zsh
+
+      - name: Rename the panel and keep it signed
+        if: steps.version.outputs.skip == 'false'
+        run: |
+          app="$RUNNER_TEMP/AMFIPASSH Monitor.app"
+          rm -rf "$app"
+          mv "/Applications/AMFipassH 状态面板.app" "$app"
+          plutil -replace CFBundleName -string "AMFIPASSH Monitor" "$app/Contents/Info.plist"
+          plutil -replace CFBundleDisplayName -string "AMFIPASSH Monitor" "$app/Contents/Info.plist" 2>/dev/null || \
+            plutil -insert CFBundleDisplayName -string "AMFIPASSH Monitor" "$app/Contents/Info.plist"
+          codesign --force --deep --options runtime \
+            --sign "Hackdoc Code Signing" --timestamp=none "$app"
+          codesign --verify --deep --strict "$app"
+          codesign -dvv "$app" 2>&1 | grep -E 'Identifier|Authority'
+          ditto -c -k --keepParent "$app" "$RUNNER_TEMP/AMFIPASSH-Monitor.zip"
+
+      - name: Write the release notes
+        if: steps.version.outputs.skip == 'false'
+        run: |
+          notes="$RUNNER_TEMP/notes.md"
+          {
+            echo "Hackdoc AMFIPassH ${{ steps.version.outputs.tag }}"
+            echo
+            echo "- kext：AMFIPassH.kext，LLVM + OLLVM strong（bcf/sub/split，函数级 flatten 由源码 HD_FLA 注解控制），Hackdoc 签名"
+            echo "- 状态面板：AMFIPASSH Monitor.app，Hackdoc 签名，不混淆"
+            echo "- 源码：pyquick/AMFIPass @ ${{ steps.version.outputs.source_commit }}"
+            echo
+            echo "安装：将 AMFIPassH.kext 放入 EFI/OC/Kexts，并在 Kernel -> Add 中排在 Lilu 之后；SecureBootModel 设为 Disabled；不要添加 amfi 启动参数。"
+            echo
+            echo "SHA256："
+            echo '```'
+            shasum -a 256 "$RUNNER_TEMP/AMFIPassH-kext-strong.zip" "$RUNNER_TEMP/AMFIPASSH-Monitor.zip" |
+              sed "s#$RUNNER_TEMP/##"
+            echo '```'
+          } > "$notes"
+          cat "$notes" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create the release
+        if: steps.version.outputs.skip == 'false'
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --repo "$TARGET_REPO" \
+            --title "AMFIPassH ${{ steps.version.outputs.version }}" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            "$RUNNER_TEMP/AMFIPassH-kext-strong.zip" \
+            "$RUNNER_TEMP/AMFIPASSH-Monitor.zip"
