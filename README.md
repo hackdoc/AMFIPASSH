@@ -12,7 +12,7 @@
 2. 检查本仓库是否已有 `v<VERSION>` 的 release；存在则直接结束，不编译。手动触发时勾选 `force` 可强制重建。
 3. 安装 Homebrew LLVM 与 cmake，构建 OLLVM 插件，用 strong 配置编译 kext：`-bcf -sub -split`，函数级 flatten 由源码的 `HD_FLA` 注解控制。
 4. 从 `HACKDOC_P12_BASE64` / `HACKDOC_P12_PASSWORD` 导入签名身份，kext 与状态面板都用 `Hackdoc Code Signing` 签名。
-5. 编译状态面板，重命名为 `AMFIPASSH Monitor`，不混淆。
+5. 编译状态面板，不混淆；源码中的 `Test/monitor/build.zsh` 已直接产出 `AMFIPASSH Monitor.app`。
 6. 打 tag 并创建 release，附上两个压缩包。
 
 ## 需要配置的 Secrets
