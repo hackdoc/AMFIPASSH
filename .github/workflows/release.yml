@@ -202,12 +202,12 @@ jobs:
         working-directory: src
         timeout-minutes: 25
         run: |
-          # Debug build: the same plugin and seed, but HACKDOC_PLAIN empties
-          # the fla/bcf annotations because -g plus flattening takes minutes;
-          # substitution and splitting remain, symbols are kept.
+          # Debug build: plugin and seed only with substitution; splitting is
+          # left out because LLVM 23 miscompiles some functions after it, and
+          # the annotations are empty under HACKDOC_PLAIN. Symbols are kept.
           start=$(date +%s)
           CXX="$LLVM_PREFIX/bin/clang++" \
-          EXTRA_CXXFLAGS="-g -fpass-plugin=$PLUGIN -mllvm -sub -mllvm -split -mllvm -aesSeed=$OBF_SEED" \
+          EXTRA_CXXFLAGS="-g -fpass-plugin=$PLUGIN -mllvm -sub -mllvm -aesSeed=$OBF_SEED" \
           HACKDOC_PLAIN=1 OBF_PROFILE=debug \
           zsh Tools/build.zsh
           echo "debug build took $(( $(date +%s) - start ))s" | tee -a "$GITHUB_STEP_SUMMARY"
